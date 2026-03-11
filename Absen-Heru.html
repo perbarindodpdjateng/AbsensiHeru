@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Absensi Pegawai</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 5px;
+      background-color: #FFFFFF;
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    .absen-quick-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .absen-quick-buttons button {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 1em;
+      font-weight: bold;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+    }
+    .btn-berangkat {
+      background-color: #28a745;
+    }
+    .btn-pulang {
+      background-color: #dc3545;
+    }
+    .btn-berangkat:hover {
+      background-color: #218838;
+    }
+    .btn-pulang:hover {
+      background-color: #c82333;
+    }
+    .absen-quick-buttons button:active {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+    #map-container {
+      margin-top: 10px;
+    }
+    .success-message {
+      text-align: center;
+      color: green;
+      display: none;
+      font-size: 1.5em;
+      animation: kedip 1s infinite;
+    }
+    @keyframes kedip {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+    progress {
+      width: 100%;
+      height: 18px;
+      margin-top: 10px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Absensi Pegawai</h2>
+  <form id="absen-form">
+    <div class="form-group">
+      <label for="nama">Nama Pegawai:</label>
+      <select id="nama" name="nama" required>
+        <option value="HERU PRASETYO WILARSO">HERU PRASETYO WILARSO</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="tanggal">Tanggal:</label>
+      <input id="tanggal" name="tanggal" type="date" readonly />
+    </div>
+
+    <div class="form-group">
+      <label for="waktu">Waktu:</label>
+      <input id="waktu" name="waktu" type="time" readonly />
+    </div>
+
+    <div class="form-group">
+      <label>Keterangan Absen:</label>
+      <div class="absen-quick-buttons">
+        <button type="button" class="btn-berangkat" onclick="submitAbsen('Berangkat')">Berangkat</button>
+        <button type="button" class="btn-pulang" onclick="submitAbsen('Pulang')">Pulang</button>
+      </div>
+    </div>
+
+    <input type="hidden" id="keterangan" name="keterangan" />
+    <button type="submit" id="submit-button" style="display: none;"></button>
+
+    <div id="map-container">
+      <iframe
+        id="map-frame"
+        height="150"
+        style="border:0; width:100%;"
+        referrerpolicy="no-referrer-when-downgrade"
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15840.43!2d110.43655!3d-6.99661!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e708d79bc47d32f%3A0xddd7d40cd7eab780!2sPerbarindo%20DPD%20Jateng%20-%20Yandora!5e0!3m2!1sid!2sid!4v1744709163306!5m2!1sid!2sid">
+      </iframe>
+      <input id="lokasi" name="lokasi" type="hidden" value="Perbarindo DPD Jateng - Yandora" />
+    </div>
+
+    <progress id="upload-progress" value="0" max="100"></progress>
+  </form>
+
+  <p class="success-message" id="success-msg">✅ Absen untuk <span id="pegawai-nama">pegawai</span> berhasil!</p>
+  <audio id="success-sound" src="https://www.myinstants.com/media/sounds/notification-sound.mp3"></audio>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const tanggalInput = document.getElementById("tanggal");
+      const waktuInput = document.getElementById("waktu");
+      const form = document.getElementById("absen-form");
+      const successMsg = document.getElementById("success-msg");
+      const submitButton = document.getElementById("submit-button");
+      const uploadProgress = document.getElementById("upload-progress");
+
+      function updateDateTime() {
+        const now = new Date();
+        tanggalInput.value = now.toISOString().split("T")[0];
+        waktuInput.value = now.toTimeString().slice(0, 5);
+      }
+
+      updateDateTime();
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        submitButton.disabled = true;
+        uploadProgress.style.display = "block";
+        uploadProgress.value = 30;
+
+        const data = new FormData(form);
+        fetch("https://script.google.com/macros/s/AKfycbxUEFgw5UyN9D8rR5MNBr8Nqaw3oGhzJ5OvJuEnu8n3icrYWW0syBqwqL0H8rUTmfhhrg/exec", {
+          method: "POST",
+          body: data,
+        })
+        .then((response) => response.text())
+        .then((responseText) => {
+          uploadProgress.value = 100;
+          document.getElementById("pegawai-nama").innerText = document.getElementById("nama").value;
+          successMsg.style.display = "block";
+          form.reset();
+          updateDateTime();
+          document.getElementById("success-sound").play();
+        })
+        .catch((error) => {
+          alert("Gagal mengirim data.");
+          console.error(error);
+        })
+        .finally(() => {
+          setTimeout(() => {
+            uploadProgress.style.display = "none";
+            uploadProgress.value = 0;
+            submitButton.disabled = false;
+          }, 1000);
+        });
+      });
+    });
+
+    function submitAbsen(keterangan) {
+      document.getElementById("keterangan").value = keterangan;
+      document.getElementById("submit-button").click();
+    }
+  </script>
+</body>
+</html>
