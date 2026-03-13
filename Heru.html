@@ -22,11 +22,14 @@
     .form-group label {
       display: block;
       margin-bottom: 5px;
+      font-weight: bold;
     }
-    .form-group input {
+    .form-group input, .form-group select {
       width: 100%;
       padding: 8px;
       box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
     .absen-quick-buttons {
       display: flex;
@@ -43,6 +46,7 @@
       border-radius: 5px;
       color: #fff;
       cursor: pointer;
+      transition: all 0.2s;
     }
     .btn-berangkat {
       background-color: #28a745;
@@ -60,8 +64,77 @@
       transform: scale(0.97);
       opacity: 0.9;
     }
-    #map-container {
+    .absen-quick-buttons button:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    /* Styling untuk koordinat */
+    .koordinat-container {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .koordinat-container h3 {
+      margin: 0 0 10px 0;
+      font-size: 1.1em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .koordinat-box {
+      background: rgba(255,255,255,0.2);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95em;
+      margin-bottom: 8px;
+    }
+    .koordinat-label {
+      font-size: 0.8em;
+      opacity: 0.9;
+      margin-bottom: 3px;
+    }
+    .status-gps {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+    .status-mencari {
+      background: #ffc107;
+      color: #000;
+    }
+    .status-berhasil {
+      background: #28a745;
+      color: #fff;
+    }
+    .status-gagal {
+      background: #dc3545;
+      color: #fff;
+    }
+    .btn-refresh-lokasi {
+      background: #17a2b8;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.9em;
       margin-top: 10px;
+      width: 100%;
+    }
+    .btn-refresh-lokasi:hover {
+      background: #138496;
+    }
+    .btn-refresh-lokasi:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
     }
     .success-message {
       text-align: center;
@@ -69,6 +142,7 @@
       display: none;
       font-size: 1.5em;
       animation: kedip 1s infinite;
+      margin-top: 15px;
     }
     @keyframes kedip {
       0% { opacity: 1; }
@@ -80,6 +154,12 @@
       height: 18px;
       margin-top: 10px;
       display: none;
+    }
+    .info-text {
+      font-size: 0.85em;
+      color: #666;
+      margin-top: 5px;
+      font-style: italic;
     }
   </style>
 </head>
@@ -106,24 +186,39 @@
     <div class="form-group">
       <label>Keterangan Absen:</label>
       <div class="absen-quick-buttons">
-        <button type="button" class="btn-berangkat" onclick="submitAbsen('Berangkat')">Berangkat</button>
-        <button type="button" class="btn-pulang" onclick="submitAbsen('Pulang')">Pulang</button>
+        <button type="button" class="btn-berangkat" id="btn-berangkat" onclick="submitAbsen('Berangkat')">Berangkat</button>
+        <button type="button" class="btn-pulang" id="btn-pulang" onclick="submitAbsen('Pulang')">Pulang</button>
       </div>
     </div>
 
+    <!-- Input hidden untuk data yang dikirim ke server -->
     <input type="hidden" id="keterangan" name="keterangan" />
+    <input type="hidden" id="latitude" name="latitude" />
+    <input type="hidden" id="longitude" name="longitude" />
+    <input type="hidden" id="akurasi" name="akurasi" />
     <button type="submit" id="submit-button" style="display: none;"></button>
 
-    <div id="map-container">
-      <iframe
-        id="map-frame"
-        height="150"
-        style="border:0; width:100%;"
-        referrerpolicy="no-referrer-when-downgrade"
-        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d15840.43!2d110.43655!3d-6.99661!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e708d79bc47d32f%3A0xddd7d40cd7eab780!2sPerbarindo%20DPD%20Jateng%20-%20Yandora!5e0!3m2!1sid!2sid!4v1744709163306!5m2!1sid!2sid">
-      </iframe>
-      <input id="lokasi" name="lokasi" type="hidden" value="Perbarindo DPD Jateng - Yandora" />
+    <!-- Tampilan Koordinat GPS -->
+    <div class="koordinat-container">
+      <h3>📍 Lokasi Saat Ini</h3>
+      
+      <div class="koordinat-label">Latitude:</div>
+      <div class="koordinat-box" id="display-latitude">Mencari...</div>
+      
+      <div class="koordinat-label">Longitude:</div>
+      <div class="koordinat-box" id="display-longitude">Mencari...</div>
+      
+      <div class="koordinat-label">Akurasi:</div>
+      <div class="koordinat-box" id="display-akurasi">-</div>
+      
+      <span class="status-gps status-mencari" id="status-gps">Mencari GPS...</span>
+      
+      <button type="button" class="btn-refresh-lokasi" id="btn-refresh" onclick="getLocation()">
+        🔄 Perbarui Lokasi
+      </button>
     </div>
+    
+    <p class="info-text">* Pastikan GPS aktif untuk akurasi lokasi yang lebih baik</p>
 
     <progress id="upload-progress" value="0" max="100"></progress>
   </form>
@@ -147,9 +242,22 @@
       }
 
       updateDateTime();
+      
+      // Ambil lokasi saat halaman dimuat
+      getLocation();
 
       form.addEventListener("submit", function (e) {
         e.preventDefault();
+        
+        // Validasi apakah koordinat sudah didapat
+        const lat = document.getElementById("latitude").value;
+        const lng = document.getElementById("longitude").value;
+        
+        if (!lat || !lng) {
+          alert("Lokasi belum terdeteksi. Mohon tunggu atau klik 'Perbarui Lokasi'.");
+          return;
+        }
+        
         submitButton.disabled = true;
         uploadProgress.style.display = "block";
         uploadProgress.value = 30;
@@ -167,6 +275,9 @@
           form.reset();
           updateDateTime();
           document.getElementById("success-sound").play();
+          
+          // Reset tampilan koordinat
+          resetKoordinatDisplay();
         })
         .catch((error) => {
           alert("Gagal mengirim data.");
@@ -182,7 +293,105 @@
       });
     });
 
+    function getLocation() {
+      const statusEl = document.getElementById("status-gps");
+      const btnRefresh = document.getElementById("btn-refresh");
+      const btnBerangkat = document.getElementById("btn-berangkat");
+      const btnPulang = document.getElementById("btn-pulang");
+      
+      // Update UI ke status mencari
+      statusEl.className = "status-gps status-mencari";
+      statusEl.textContent = "Mencari GPS...";
+      btnRefresh.disabled = true;
+      btnBerangkat.disabled = true;
+      btnPulang.disabled = true;
+      
+      document.getElementById("display-latitude").textContent = "Mencari...";
+      document.getElementById("display-longitude").textContent = "Mencari...";
+      document.getElementById("display-akurasi").textContent = "-";
+      
+      if (!navigator.geolocation) {
+        updateStatusGagal("Browser tidak mendukung Geolocation");
+        return;
+      }
+      
+      // Opsi untuk meningkatkan akurasi
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+      
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+          
+          // Simpan ke input hidden
+          document.getElementById("latitude").value = lat;
+          document.getElementById("longitude").value = lng;
+          document.getElementById("akurasi").value = accuracy;
+          
+          // Tampilkan di UI
+          document.getElementById("display-latitude").textContent = lat.toFixed(6);
+          document.getElementById("display-longitude").textContent = lng.toFixed(6);
+          document.getElementById("display-akurasi").textContent = "±" + Math.round(accuracy) + " meter";
+          
+          // Update status
+          statusEl.className = "status-gps status-berhasil";
+          statusEl.textContent = "Lokasi berhasil dideteksi ✓";
+          btnRefresh.disabled = false;
+          btnBerangkat.disabled = false;
+          btnPulang.disabled = false;
+        },
+        function(error) {
+          let errorMsg = "Gagal mendapatkan lokasi";
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg = "Akses lokasi ditolak. Mohon izinkan akses lokasi.";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg = "Informasi lokasi tidak tersedia.";
+              break;
+            case error.TIMEOUT:
+              errorMsg = "Waktu mencari lokasi habis. Coba lagi.";
+              break;
+          }
+          updateStatusGagal(errorMsg);
+        },
+        options
+      );
+    }
+    
+    function updateStatusGagal(message) {
+      const statusEl = document.getElementById("status-gps");
+      const btnRefresh = document.getElementById("btn-refresh");
+      
+      statusEl.className = "status-gps status-gagal";
+      statusEl.textContent = message;
+      btnRefresh.disabled = false;
+      
+      document.getElementById("display-latitude").textContent = "Gagal";
+      document.getElementById("display-longitude").textContent = "Gagal";
+      document.getElementById("display-akurasi").textContent = "-";
+    }
+    
+    function resetKoordinatDisplay() {
+      document.getElementById("latitude").value = "";
+      document.getElementById("longitude").value = "";
+      document.getElementById("akurasi").value = "";
+      getLocation(); // Ambil ulang lokasi
+    }
+
     function submitAbsen(keterangan) {
+      // Validasi lokasi sebelum submit
+      const lat = document.getElementById("latitude").value;
+      if (!lat) {
+        alert("Lokasi belum terdeteksi. Mohon tunggu GPS siap.");
+        return;
+      }
+      
       document.getElementById("keterangan").value = keterangan;
       document.getElementById("submit-button").click();
     }
